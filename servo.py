@@ -1,24 +1,32 @@
 import machine
-import time
-# กำหนดขา GPIO สำหรับสั่งการ Servo Motor
-servo_pin = 12  # เปลี่ยนตามขา GPIO ที่คุณใช้
-# สร้างออบเจ็กต์ PWM บนขาที่ระบุ
-pwm = machine.PWM(machine.Pin(servo_pin))
-# กำหนดค่าความถี่และช่วงค่าหน้าที่ของ PWM
-pwm.freq(50)  # ปรับค่านี้ตามความต้องการ
-pwm.duty(77)  # ปรับค่านี้ตามความต้องการ
+import math
 
-# ฟังก์ชันสำหรับเลื่อน Servo Motor ไปยังมุมที่กำหนด
-def set_servo_angle(angle):
-    # แปลงมุม (เป็นองศา) เป็นค่าหน้าที่ (duty cycle)
-    duty = int(40 + (75 / 180) * angle)  # ปรับค่านี้ตามความต้องการ
-    pwm.duty(duty)
-    time.sleep_ms(500)  # รอให้ Servo Motor เคลื่อนที่ (ตัวเลือก)
+class Servo:
+    def __init__(self,pin_id,min_us=544.0,max_us=2400.0,min_deg=0.0,max_deg=180.0,freq=50):
+        self.pwm = machine.PWM(machine.Pin(pin_id))
+        self.pwm.freq(freq)
+        self.current_us = 0.0
+        self._slope = (min_us-max_us)/(math.radians(min_deg)-math.radians(max_deg))
+        self._offset = min_us
+        
+    def write(self,deg):
+        self.write_rad(math.radians(deg))
 
-# ตัวอย่างการใช้งาน: เลื่อน Servo Motor ไปยังมุม 0 องศา รอสักครู่ แล้วเลื่อนไปยังมุม 90 องศา
-set_servo_angle(0)
-time.sleep(1)  # รอเป็นเวลา 1 วินาที
-set_servo_angle(90)
+    def read(self):
+        return math.degrees(self.read_rad())
+        
+    def write_rad(self,rad):
+        self.write_us(rad*self._slope+self._offset)
+    
+    def read_rad(self):
+        return (self.current_us-self._offset)/self._slope
+        
+    def write_us(self,us):
+        self.current_us=us
+        self.pwm.duty_ns(int(self.current_us*1000.0))
+    
+    def read_us(self):
+        return self.current_us
 
-# ล้างและคืนทรัพยากร
-pwm.deinit()
+    def off(self):
+        self.pwm.duty_ns(0)
